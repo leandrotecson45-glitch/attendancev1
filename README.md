@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -6,6 +6,8 @@
 <title>Field Attendance System</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
 
 <style>
 body {
@@ -15,7 +17,6 @@ body {
     color: white;
 }
 
-/* TOP BAR */
 .topbar {
     display: flex;
     gap: 5px;
@@ -41,10 +42,8 @@ button {
 .timein { background: #22c55e; }
 .timeout { background: #ef4444; }
 
-/* MAP FULL SCREEN */
 #map {
     height: calc(100vh - 60px);
-    width: 100%;
 }
 </style>
 </head>
@@ -52,7 +51,7 @@ button {
 <body>
 
 <div class="topbar">
-    <input type="text" id="name" placeholder="Enter Field Supervisor Name">
+    <input type="text" id="name" placeholder="Enter Name">
     <button class="timein" onclick="timeIn()">TIME IN</button>
     <button class="timeout" onclick="timeOut()">TIME OUT</button>
 </div>
@@ -60,25 +59,33 @@ button {
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
 <script>
 
-// ================= MAP =================
+// MAP INIT
 const map = L.map('map').setView([15.5, 120.9], 14);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap'
-}).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// ================= STORAGE =================
+// 🔥 CLUSTER GROUP (KEY SOLUTION)
+const markers = L.markerClusterGroup({
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false
+});
+
+map.addLayer(markers);
+
+// STORAGE
 let records = JSON.parse(localStorage.getItem("attendance_data")) || [];
 
-// LOAD EXISTING PINS
+// LOAD EXISTING
 records.forEach(addMarker);
 
-// ================= ADD MARKER =================
+// ADD MARKER
 function addMarker(data) {
-    const marker = L.marker([data.lat, data.lon]).addTo(map);
+
+    const marker = L.marker([data.lat, data.lon]);
 
     marker.bindPopup(`
         <b>👤 ${data.name}</b><br>
@@ -86,93 +93,47 @@ function addMarker(data) {
         🕒 ${data.time}<br>
         📍 ${data.lat.toFixed(5)}, ${data.lon.toFixed(5)}
     `);
+
+    markers.addLayer(marker); // 🔥 IMPORTANT
 }
 
-// ================= GPS FUNCTION =================
+// GPS
 function getLocation(callback) {
-
-    if (!navigator.geolocation) {
-        alert("❌ GPS not supported sa device");
-        return;
-    }
-
     navigator.geolocation.getCurrentPosition(
-
-        // SUCCESS
-        (pos) => {
-            callback(pos.coords.latitude, pos.coords.longitude);
-        },
-
-        // ERROR HANDLER
-        (err) => {
-
-            if (err.code === 1) {
-                alert("❌ DENIED: I-enable mo Location permission sa browser");
-            }
-            else if (err.code === 2) {
-                alert("❌ Hindi ma-detect location. I-ON mo GPS");
-            }
-            else if (err.code === 3) {
-                alert("❌ Timeout. Mahina GPS signal");
-            }
-            else {
-                alert("❌ Unknown GPS error");
-            }
-
-            console.log(err);
-        },
-
-        {
-            enableHighAccuracy: true,
-            timeout: 15000,
-            maximumAge: 0
-        }
+        pos => callback(pos.coords.latitude, pos.coords.longitude),
+        err => alert("Enable GPS + allow permission"),
+        { enableHighAccuracy: true }
     );
 }
 
-// ================= SAVE =================
+// SAVE
 function save(type) {
     const name = document.getElementById("name").value;
-
-    if (!name) {
-        alert("Enter name muna");
-        return;
-    }
+    if (!name) return alert("Enter name");
 
     getLocation((lat, lon) => {
 
         const now = new Date();
 
         const record = {
-            name: name,
-            type: type,
+            name,
+            type,
             time: now.toLocaleString(),
-            lat: lat,
-            lon: lon
+            lat,
+            lon
         };
 
-        // SAVE DATA
         records.push(record);
         localStorage.setItem("attendance_data", JSON.stringify(records));
 
-        // ADD PIN
         addMarker(record);
 
-        // FOCUS MAP
-        map.setView([lat, lon], 17);
-
-        alert("✅ " + type + " saved");
+        map.setView([lat, lon], 18);
     });
 }
 
-// ================= BUTTONS =================
-function timeIn() {
-    save("TIME IN");
-}
-
-function timeOut() {
-    save("TIME OUT");
-}
+function timeIn() { save("TIME IN"); }
+function timeOut() { save("TIME OUT"); }
 
 </script>
 
