@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Field Attendance Map</title>
+<title>Field Attendance System</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
@@ -15,11 +15,12 @@ body {
     color: white;
 }
 
+/* TOP BAR */
 .topbar {
-    padding: 10px;
-    background: #1e293b;
     display: flex;
     gap: 5px;
+    padding: 10px;
+    background: #1e293b;
 }
 
 input {
@@ -40,8 +41,10 @@ button {
 .timein { background: #22c55e; }
 .timeout { background: #ef4444; }
 
+/* FULL MAP */
 #map {
-    height: 90vh;
+    height: calc(100vh - 60px);
+    width: 100%;
 }
 </style>
 </head>
@@ -49,9 +52,9 @@ button {
 <body>
 
 <div class="topbar">
-    <input type="text" id="name" placeholder="Enter Name">
-    <button class="timein" onclick="timeIn()">TIME IN</button>
-    <button class="timeout" onclick="timeOut()">TIME OUT</button>
+    <input type="text" id="name" placeholder="Enter Field Supervisor Name">
+    <button class="timein" onclick="timeIn()">IN</button>
+    <button class="timeout" onclick="timeOut()">OUT</button>
 </div>
 
 <div id="map"></div>
@@ -59,85 +62,96 @@ button {
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-// INIT MAP
-const map = L.map('map').setView([15.5, 120.9], 13);
+
+// ================= MAP INIT =================
+const map = L.map('map').setView([15.5, 120.9], 14);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
 }).addTo(map);
 
-// LOAD DATA
-let records = JSON.parse(localStorage.getItem("attendance_v2")) || [];
+// ================= LOAD SAVED DATA =================
+let records = JSON.parse(localStorage.getItem("attendance_data")) || [];
 
-// LOAD ALL MARKERS
-records.forEach(r => {
-    addMarker(r);
-});
+// show all saved pins
+records.forEach(r => addMarker(r));
 
-// FUNCTION: ADD MARKER
+// ================= ADD MARKER =================
 function addMarker(data) {
     const marker = L.marker([data.lat, data.lon]).addTo(map);
 
-    const label = `
-        <b>${data.name}</b><br>
+    marker.bindPopup(`
+        <b>👤 ${data.name}</b><br>
         ${data.type}<br>
         🕒 ${data.time}<br>
         📍 ${data.lat.toFixed(5)}, ${data.lon.toFixed(5)}
-    `;
-
-    marker.bindPopup(label);
+    `);
 }
 
-// GET GPS
+// ================= GPS =================
 function getLocation(callback) {
-    navigator.geolocation.getCurrentPosition(pos => {
-        callback(pos.coords.latitude, pos.coords.longitude);
+    if (!navigator.geolocation) {
+        alert("GPS not supported");
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            callback(pos.coords.latitude, pos.coords.longitude);
+        },
+        (err) => {
+            alert("Please enable GPS + location permission");
+            console.log(err);
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 10000
+        }
+    );
+}
+
+// ================= SAVE =================
+function save(type) {
+    const name = document.getElementById("name").value;
+
+    if (!name) {
+        alert("Please enter name");
+        return;
+    }
+
+    getLocation((lat, lon) => {
+
+        const now = new Date();
+
+        const record = {
+            name: name,
+            type: type,
+            time: now.toLocaleString(),
+            lat: lat,
+            lon: lon
+        };
+
+        // save to storage
+        records.push(record);
+        localStorage.setItem("attendance_data", JSON.stringify(records));
+
+        // add pin
+        addMarker(record);
+
+        // zoom to location
+        map.setView([lat, lon], 17);
     });
 }
 
-// SAVE RECORD
-function saveRecord(type, name, lat, lon) {
-    const now = new Date();
-    const time = now.toLocaleString();
-
-    const record = {
-        id: Date.now(),
-        name,
-        type,
-        time,
-        lat,
-        lon
-    };
-
-    records.push(record);
-    localStorage.setItem("attendance_v2", JSON.stringify(records));
-
-    addMarker(record);
-
-    map.setView([lat, lon], 16);
-
-    alert(`${type} saved for ${name}`);
-}
-
-// TIME IN
+// ================= BUTTONS =================
 function timeIn() {
-    const name = document.getElementById("name").value;
-    if (!name) return alert("Enter name");
-
-    getLocation((lat, lon) => {
-        saveRecord("TIME IN", name, lat, lon);
-    });
+    save("TIME IN");
 }
 
-// TIME OUT
 function timeOut() {
-    const name = document.getElementById("name").value;
-    if (!name) return alert("Enter name");
-
-    getLocation((lat, lon) => {
-        saveRecord("TIME OUT", name, lat, lon);
-    });
+    save("TIME OUT");
 }
+
 </script>
 
 </body>
