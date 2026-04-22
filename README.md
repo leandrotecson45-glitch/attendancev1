@@ -41,7 +41,7 @@ button {
 .timein { background: #22c55e; }
 .timeout { background: #ef4444; }
 
-/* FULL MAP */
+/* MAP FULL SCREEN */
 #map {
     height: calc(100vh - 60px);
     width: 100%;
@@ -53,8 +53,8 @@ button {
 
 <div class="topbar">
     <input type="text" id="name" placeholder="Enter Field Supervisor Name">
-    <button class="timein" onclick="timeIn()">IN</button>
-    <button class="timeout" onclick="timeOut()">OUT</button>
+    <button class="timein" onclick="timeIn()">TIME IN</button>
+    <button class="timeout" onclick="timeOut()">TIME OUT</button>
 </div>
 
 <div id="map"></div>
@@ -63,18 +63,18 @@ button {
 
 <script>
 
-// ================= MAP INIT =================
+// ================= MAP =================
 const map = L.map('map').setView([15.5, 120.9], 14);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
 }).addTo(map);
 
-// ================= LOAD SAVED DATA =================
+// ================= STORAGE =================
 let records = JSON.parse(localStorage.getItem("attendance_data")) || [];
 
-// show all saved pins
-records.forEach(r => addMarker(r));
+// LOAD EXISTING PINS
+records.forEach(addMarker);
 
 // ================= ADD MARKER =================
 function addMarker(data) {
@@ -88,24 +88,44 @@ function addMarker(data) {
     `);
 }
 
-// ================= GPS =================
+// ================= GPS FUNCTION =================
 function getLocation(callback) {
+
     if (!navigator.geolocation) {
-        alert("GPS not supported");
+        alert("❌ GPS not supported sa device");
         return;
     }
 
     navigator.geolocation.getCurrentPosition(
+
+        // SUCCESS
         (pos) => {
             callback(pos.coords.latitude, pos.coords.longitude);
         },
+
+        // ERROR HANDLER
         (err) => {
-            alert("Please enable GPS + location permission");
+
+            if (err.code === 1) {
+                alert("❌ DENIED: I-enable mo Location permission sa browser");
+            }
+            else if (err.code === 2) {
+                alert("❌ Hindi ma-detect location. I-ON mo GPS");
+            }
+            else if (err.code === 3) {
+                alert("❌ Timeout. Mahina GPS signal");
+            }
+            else {
+                alert("❌ Unknown GPS error");
+            }
+
             console.log(err);
         },
+
         {
             enableHighAccuracy: true,
-            timeout: 10000
+            timeout: 15000,
+            maximumAge: 0
         }
     );
 }
@@ -115,7 +135,7 @@ function save(type) {
     const name = document.getElementById("name").value;
 
     if (!name) {
-        alert("Please enter name");
+        alert("Enter name muna");
         return;
     }
 
@@ -131,15 +151,17 @@ function save(type) {
             lon: lon
         };
 
-        // save to storage
+        // SAVE DATA
         records.push(record);
         localStorage.setItem("attendance_data", JSON.stringify(records));
 
-        // add pin
+        // ADD PIN
         addMarker(record);
 
-        // zoom to location
+        // FOCUS MAP
         map.setView([lat, lon], 17);
+
+        alert("✅ " + type + " saved");
     });
 }
 
